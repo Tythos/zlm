@@ -238,3 +238,137 @@ test "vec4 swizzle" {
     assert(std.meta.eql(vec4(3, 4, 2, 1), vec4(1, 2, 3, 4).swizzle("zwyx")));
     assert(std.meta.eql(@as(f32, 3), vec4(1, 2, 3, 4).swizzle("z")));
 }
+
+test "radians and degrees conversion" {
+    const pi = std.math.pi;
+    
+    // Test radians conversion (degrees to radians)
+    try std.testing.expectApproxEqAbs(0.0, math_f32.radians(0.0), 1e-6);
+    try std.testing.expectApproxEqAbs(pi / 2.0, math_f32.radians(90.0), 1e-6);
+    try std.testing.expectApproxEqAbs(pi, math_f32.radians(180.0), 1e-6);
+    try std.testing.expectApproxEqAbs(2.0 * pi, math_f32.radians(360.0), 1e-6);
+    
+    // Test degrees conversion (radians to degrees)
+    try std.testing.expectApproxEqAbs(0.0, math_f32.degrees(0.0), 1e-6);
+    try std.testing.expectApproxEqAbs(90.0, math_f32.degrees(pi / 2.0), 1e-6);
+    try std.testing.expectApproxEqAbs(180.0, math_f32.degrees(pi), 1e-6);
+    try std.testing.expectApproxEqAbs(360.0, math_f32.degrees(2.0 * pi), 1e-6);
+    
+    // Test round-trip conversion
+    try std.testing.expectApproxEqAbs(45.0, math_f32.degrees(math_f32.radians(45.0)), 1e-6);
+    try std.testing.expectApproxEqAbs(pi / 4.0, math_f32.radians(math_f32.degrees(pi / 4.0)), 1e-6);
+}
+
+test "rotate matrix" {
+    const pi = std.math.pi;
+    
+    // Test rotation around Z axis by 90 degrees
+    const mat = Mat4.identity;
+    const rotated = math_f32.rotate(mat, pi / 2.0, vec3(0, 0, 1));
+    
+    // After rotating 90 degrees around Z, a point at (1, 0, 0) should be at (0, 1, 0)
+    const point = vec4(1, 0, 0, 1);
+    const result = Vec4.transform(point, rotated);
+    
+    try std.testing.expectApproxEqAbs(0.0, result.x, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result.y, 1e-6);
+    try std.testing.expectApproxEqAbs(0.0, result.z, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result.w, 1e-6);
+    
+    // Test rotation around X axis by 90 degrees
+    const rotated_x = math_f32.rotate(Mat4.identity, pi / 2.0, vec3(1, 0, 0));
+    const point_y = vec4(0, 1, 0, 1);
+    const result_x = Vec4.transform(point_y, rotated_x);
+    
+    try std.testing.expectApproxEqAbs(0.0, result_x.x, 1e-6);
+    try std.testing.expectApproxEqAbs(0.0, result_x.y, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result_x.z, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result_x.w, 1e-6);
+}
+
+test "scale matrix" {
+    // Test uniform scaling
+    const mat = Mat4.identity;
+    const scaled = math_f32.scale(mat, vec3(2, 2, 2));
+    
+    const point = vec4(1, 2, 3, 1);
+    const result = Vec4.transform(point, scaled);
+    
+    try std.testing.expectApproxEqAbs(2.0, result.x, 1e-6);
+    try std.testing.expectApproxEqAbs(4.0, result.y, 1e-6);
+    try std.testing.expectApproxEqAbs(6.0, result.z, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result.w, 1e-6);
+    
+    // Test non-uniform scaling
+    const scaled_non_uniform = math_f32.scale(Mat4.identity, vec3(1, 2, 3));
+    const result2 = Vec4.transform(point, scaled_non_uniform);
+    
+    try std.testing.expectApproxEqAbs(1.0, result2.x, 1e-6);
+    try std.testing.expectApproxEqAbs(4.0, result2.y, 1e-6);
+    try std.testing.expectApproxEqAbs(9.0, result2.z, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result2.w, 1e-6);
+}
+
+test "translate matrix" {
+    // Test basic translation
+    const mat = Mat4.identity;
+    const translated = math_f32.translate(mat, vec3(10, 20, 30));
+    
+    const point = vec4(1, 2, 3, 1);
+    const result = Vec4.transform(point, translated);
+    
+    try std.testing.expectApproxEqAbs(11.0, result.x, 1e-6);
+    try std.testing.expectApproxEqAbs(22.0, result.y, 1e-6);
+    try std.testing.expectApproxEqAbs(33.0, result.z, 1e-6);
+    try std.testing.expectApproxEqAbs(1.0, result.w, 1e-6);
+    
+    // Test that directions (w=0) are not affected by translation
+    const direction = vec4(1, 0, 0, 0);
+    const result_dir = Vec4.transform(direction, translated);
+    
+    try std.testing.expectApproxEqAbs(1.0, result_dir.x, 1e-6);
+    try std.testing.expectApproxEqAbs(0.0, result_dir.y, 1e-6);
+    try std.testing.expectApproxEqAbs(0.0, result_dir.z, 1e-6);
+    try std.testing.expectApproxEqAbs(0.0, result_dir.w, 1e-6);
+}
+
+test "value_ptr" {
+    const mat = Mat4{
+        .fields = [4][4]f32{
+            [4]f32{ 1, 2, 3, 4 },
+            [4]f32{ 5, 6, 7, 8 },
+            [4]f32{ 9, 10, 11, 12 },
+            [4]f32{ 13, 14, 15, 16 },
+        },
+    };
+    
+    const ptr = math_f32.value_ptr(&mat);
+    
+    // Verify the pointer points to the beginning of the matrix data
+    try std.testing.expectEqual(@intFromPtr(&mat.fields[0][0]), @intFromPtr(ptr));
+    
+    // Verify we can read the first element through the pointer
+    try std.testing.expectEqual(@as(f32, 1), ptr.*);
+}
+
+test "combined transformations" {
+    const pi = std.math.pi;
+    
+    // Test combining translation, rotation, and scaling
+    var mat = Mat4.identity;
+    mat = math_f32.translate(mat, vec3(10, 0, 0));
+    mat = math_f32.rotate(mat, pi / 2.0, vec3(0, 0, 1));
+    mat = math_f32.scale(mat, vec3(2, 2, 2));
+    
+    const point = vec4(1, 0, 0, 1);
+    const result = Vec4.transform(point, mat);
+    
+    // After translation by (10,0,0), rotation 90° around Z, and scaling by 2:
+    // (1,0,0,1) -> (11,0,0,1) after translation
+    // (11,0,0,1) -> (0,11,0,1) after rotation
+    // (0,11,0,1) -> (0,22,0,1) after scaling
+    try std.testing.expectApproxEqAbs(0.0, result.x, 1e-5);
+    try std.testing.expectApproxEqAbs(22.0, result.y, 1e-5);
+    try std.testing.expectApproxEqAbs(0.0, result.z, 1e-5);
+    try std.testing.expectApproxEqAbs(1.0, result.w, 1e-5);
+}
